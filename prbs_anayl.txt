@@ -1,0 +1,66 @@
+This doc shows the working of 5 bit LFSR and explains the choice used in code.  
+
+LFSR 5 
+feedback ploynomial = x^5+x^4+1      ; below we see why this does not work. It does not transition to all values from 1 to 31 
+
+abcde (a^e)abcd
+00001	
+10000
+11000
+11100
+11110
+11111
+01111
+10111
+01011
+10101
+01010
+00101
+10010
+11001
+01100
+00110
+00011
+10001
+01000
+00100
+00010
+00001
+
+LFSR 5
+feedback polynomial = x^5+x^3+1  ; period 31. all values covered. 
+
+abcde -> (c^e)abcd , mole loc =  (state mod 16) 
+00001	1	1		
+10000	16	0		
+01000	8	8	
+00100	4	4	
+10010	18	2	
+01001	9	9	
+10100	20	4	
+11010	26	10	
+01101	13	13	
+00110	6	6	
+10011	19	3	
+11001	25	9	
+11100	28	12	
+11110	30	14	
+11111	31	15	
+01111	15	15 /0  .... same state so we can condition to assign mole_loc = 0 here. 
+00111	7	7	
+00011	3	3	
+10001	17	1	
+11000	24	8	
+01100	12	12	
+10110	22	6	
+11011	27	11	
+11101	29	13	
+01110	14	14	
+10111	23	7	
+01011	11	11	
+10101	21	5	
+01010	10	10	
+00101	5	5	
+00010	2	2	
+
+00001  ;; repeats

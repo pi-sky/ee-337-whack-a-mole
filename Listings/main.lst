@@ -1,0 +1,256 @@
+C51 COMPILER V9.60.0.0   MAIN                                                              04/07/2021 09:25:14 PAGE 1   
+
+
+C51 COMPILER V9.60.0.0, COMPILATION OF MODULE MAIN
+OBJECT MODULE PLACED IN .\Objects\main.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE main.c OPTIMIZE(8,SPEED) BROWSE DEBUG OBJECTEXTEND PRINT(.\Listings\main
+                    -.lst) TABS(2) OBJECT(.\Objects\main.obj)
+
+line level    source
+
+   1          #include <at89c5131.h>
+   2          #include "lcd.h"    //Header file with LCD interfacing functions
+   3          #include "serial.c" //C file with UART interfacing functions
+   4          #include <stdio.h> 
+   5          
+   6          bit b0 = 0;              // LSB of state of LFSR
+   7          
+   8          // define global variables 
+   9          unsigned char state = 0;  
+  10          unsigned char mol_loc = 0; 
+  11          unsigned int score = 0;
+  12          unsigned int high_score = 0;
+  13          unsigned char disp_score[16];
+  14          unsigned int inter_count = 0;    // no. of timer 0 interrupts
+  15          unsigned char holes[16] = "qwertyuiasdfghjk";               //keys mapped {'q','w','e','r','t','y','u','i'
+             -,'a','s','d','f','g','h','j','k'};
+  16          unsigned char game_over_var = 0;   // works as a flag for indicating if game is over.
+  17          
+  18          //function prototypes 
+  19          void init_lfsr(void);
+  20          void load_next_state(void);
+  21          void start_game(void);  
+  22          unsigned char map_to_location(unsigned char key_hit);
+  23          void disp_mole(void);
+  24          void game_over(void);
+  25          void interrupt_timer0(void);  
+  26            
+  27          // initialize lfsr with non-zero state and initial location of mole
+  28          void init_lfsr(void)
+  29          {
+  30   1        b0 = 1;
+  31   1        state = 1;
+  32   1        mol_loc = 1;
+  33   1      }
+  34          
+  35          // We use a Fibonacci maximal 5 bit LFSR for generating PRBS with period 31 , feedback poly = x^5+ x^3 +1 
+             -; refer readme.txt also
+  36          void load_next_state(void)
+  37          {
+  38   1        // state = (0 b4 b3 b2 b1) + ((b0^b2) 0 0 0 0) 
+  39   1        state = (state>>1) + ((b0^ ((state & 0x04)>>2) )<<4);     
+  40   1        b0 = (state & 0x01);
+  41   1        if (state==15)             
+  42   1        {
+  43   2          mol_loc = 0;
+  44   2        }
+  45   1        else
+  46   1        {
+  47   2          mol_loc = state % 16;
+  48   2        }
+  49   1      }
+  50          
+  51          
+  52          void start_game(void)
+C51 COMPILER V9.60.0.0   MAIN                                                              04/07/2021 09:25:14 PAGE 2   
+
+  53          {
+  54   1        lcd_cmd(0x01);
+  55   1        lcd_cmd(0x84);
+  56   1        lcd_write_string("Get Ready");
+  57   1        msdelay(2000);
+  58   1        lcd_cmd(0x01);
+  59   1        
+  60   1        lcd_cmd(0x83);
+  61   1        lcd_write_string("********");
+  62   1        lcd_cmd(0xC3);
+  63   1        lcd_write_string("********");
+  64   1        
+  65   1        msdelay(3000);
+  66   1        score = 0;              
+  67   1        inter_count = 0;
+  68   1        REN = 1;   // enable receiving
+  69   1        TR0 = 1;  // start timer 0
+  70   1        
+  71   1      //  state = seed;
+  72   1      } 
+  73          
+  74          // given an argument key_hit which is entered by user , this func returns the corresponding char ie locati
+             -on no. 
+  75          //If key is not from the defined holes[] domain, return null char
+  76          unsigned char map_to_location(unsigned char key_hit)
+  77          {
+  78   1        unsigned char played_no = 0;
+  79   1        for (played_no = 0; played_no<16; played_no++)
+  80   1        {
+  81   2          if (holes[played_no] == key_hit)
+  82   2          {
+  83   3            return played_no;
+  84   3          }else{
+  85   3          }
+  86   2        }
+  87   1        return "\0";
+  88   1      
+  89   1      }
+  90          // display mole location on LCD
+  91          void disp_mole(void)
+  92          {
+  93   1        unsigned char hole_no = 0;
+  94   1        lcd_cmd(0x01);
+  95   1        lcd_cmd(0x83);
+  96   1        
+  97   1        while(hole_no < 8)
+  98   1        {
+  99   2          if (hole_no == mol_loc)
+ 100   2          {
+ 101   3            lcd_write_string("m");
+ 102   3          }
+ 103   2          else{
+ 104   3            lcd_write_string("*");
+ 105   3          }
+ 106   2          hole_no=hole_no+1;
+ 107   2        }
+ 108   1        
+ 109   1        lcd_cmd(0xC3);
+ 110   1        while(hole_no < 16)
+ 111   1        {
+ 112   2          if (hole_no == mol_loc)
+ 113   2          {
+C51 COMPILER V9.60.0.0   MAIN                                                              04/07/2021 09:25:14 PAGE 3   
+
+ 114   3            lcd_write_string("m");
+ 115   3          }
+ 116   2          else{
+ 117   3            lcd_write_string("*");
+ 118   3          }
+ 119   2          hole_no=hole_no+1;
+ 120   2        }
+ 121   1        
+ 122   1      }
+ 123          // This func stops game. Shows score and highscore on LCD. 
+ 124          void game_over(void)
+ 125          {
+ 126   1        lcd_cmd(0x01);
+ 127   1        lcd_cmd(0x82);
+ 128   1        lcd_write_string("Game over :D");
+ 129   1        msdelay(2000);
+ 130   1        
+ 131   1        lcd_cmd(0x01);
+ 132   1        lcd_cmd(0x80);
+ 133   1        sprintf(disp_score, "Score: %u", score);
+ 134   1        lcd_write_string(disp_score);
+ 135   1        
+ 136   1        if (score>high_score)
+ 137   1        {
+ 138   2          high_score = score;
+ 139   2        }
+ 140   1        else{
+ 141   2        }
+ 142   1        
+ 143   1        sprintf(disp_score, "High Score: %u", high_score);
+ 144   1        lcd_cmd(0xC0);
+ 145   1        lcd_write_string(disp_score);
+ 146   1        msdelay(3000);
+ 147   1        
+ 148   1        game_over_var = 0;
+ 149   1      }
+ 150          // timer 0 is used as a 10 seconds timer
+ 151          void interrupt_timer0(void) interrupt 1
+ 152          {
+ 153   1        inter_count = inter_count+1;
+ 154   1        if (inter_count==305)
+ 155   1        {
+ 156   2          TH0 = 0xD3;      
+ 157   2          TL0 = 0x00;
+ 158   2        }
+ 159   1        else if (inter_count==306)
+ 160   1        {
+ 161   2          TR0 = 0;    // stop timer after 10 s
+ 162   2          game_over_var = 1;
+ 163   2          REN = 0;   // stop receiving
+ 164   2        }
+ 165   1        else
+ 166   1        {
+ 167   2          TH0 = 0x00;
+ 168   2          TL0 = 0x00;
+ 169   2        }
+ 170   1      }
+ 171          
+ 172          void main(void)
+ 173          {
+ 174   1        unsigned char ch = 0;
+ 175   1        unsigned char player_move = 0 ; 
+C51 COMPILER V9.60.0.0   MAIN                                                              04/07/2021 09:25:14 PAGE 4   
+
+ 176   1        
+ 177   1        
+ 178   1        //Call initialization functions
+ 179   1        lcd_init();
+ 180   1        uart_init();
+ 181   1        init_lfsr();
+ 182   1        
+ 183   1        // start game 
+ 184   1        start_game();
+ 185   1        disp_mole();
+ 186   1        game_over_var = 0;
+ 187   1        while(1)                // keep playing forever.
+ 188   1        {
+ 189   2          
+ 190   2           // code to check lsfr sequences
+ 191   2          /* for( ch =0; ch<40; ch++)
+ 192   2          {
+ 193   2            load_next_state();
+ 194   2          }   
+ 195   2          while(1);
+ 196   2          */
+ 197   2          
+ 198   2          if(game_over_var==1)
+ 199   2          {
+ 200   3            game_over();
+ 201   3            start_game();   // restart game
+ 202   3            disp_mole();
+ 203   3          }
+ 204   2          else{
+ 205   3          }
+ 206   2          
+ 207   2          ch = receive_char(& game_over_var);        
+ 208   2          player_move = map_to_location(ch); 
+ 209   2          
+ 210   2          if (player_move == mol_loc)      
+ 211   2          {
+ 212   3            score = score+1;    
+ 213   3            load_next_state();
+ 214   3            disp_mole(); 
+ 215   3          }
+ 216   2          else
+ 217   2          {
+ 218   3            //do nothing if key does not match 
+ 219   3          }
+ 220   2          
+ 221   2        }
+ 222   1      }
+ 223          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    732    ----
+   CONSTANT SIZE    =     63    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =     41       6
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =      3    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)
